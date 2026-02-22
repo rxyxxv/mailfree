@@ -238,13 +238,26 @@ export function extractVerificationCode({ subject = '', text = '', html = '' } =
   const textBody = String(text || '');
   const htmlBody = stripHtml(html);
 
-  const sources = {
-    subject: subjectText,
-    body: `${textBody} ${htmlBody}`.trim()
-  };
+  const fullSubject = subjectText.trim();
+  const fullBody = `${textBody} ${htmlBody}`.trim();
 
   const minLen = 4;
   const maxLen = 8;
+
+  // ===============================
+  // ✅ 1️⃣ 支持字母数字格式 (E8F-3VB)
+  // ===============================
+  const alphaNumPattern = /\b[A-Z0-9]{3}-[A-Z0-9]{3}\b/;
+
+  const m1 = fullSubject.match(alphaNumPattern);
+  if (m1) return m1[0];
+
+  const m2 = fullBody.match(alphaNumPattern);
+  if (m2) return m2[0];
+
+  // ===============================
+  // ✅ 2️⃣ 原有纯数字逻辑
+  // ===============================
 
   function normalizeDigits(s) {
     const digits = String(s || '').replace(/\D+/g, '');
@@ -256,39 +269,16 @@ export function extractVerificationCode({ subject = '', text = '', html = '' } =
   const sepClass = "[\\u00A0\\s\\-–—_.·•∙‧'']";
   const codeChunk = `([0-9](?:${sepClass}?[0-9]){3,7})`;
 
-  const subjectOrdereds = [
-    new RegExp(`${kw}[^\n\r\d]{0,20}(?<!\\d)${codeChunk}(?!\\d)`, 'i'),
-    new RegExp(`(?<!\\d)${codeChunk}(?!\\d)[^\n\r\d]{0,20}${kw}`, 'i'),
-  ];
-  for (const r of subjectOrdereds) {
-    const m = sources.subject.match(r);
-    if (m && m[1]) {
-      const n = normalizeDigits(m[1]);
-      if (n) return n;
-    }
-  }
-
-  const bodyOrdereds = [
+  const patterns = [
     new RegExp(`${kw}[^\n\r\d]{0,30}(?<!\\d)${codeChunk}(?!\\d)`, 'i'),
     new RegExp(`(?<!\\d)${codeChunk}(?!\\d)[^\n\r\d]{0,30}${kw}`, 'i'),
   ];
-  for (const r of bodyOrdereds) {
-    const m = sources.body.match(r);
-    if (m && m[1]) {
-      const n = normalizeDigits(m[1]);
-      if (n) return n;
-    }
-  }
 
-  const looseBodyOrdereds = [
-    new RegExp(`${kw}[^\n\r\d]{0,80}(?<!\\d)${codeChunk}(?!\\d)`, 'i'),
-    new RegExp(`(?<!\\d)${codeChunk}(?!\\d)[^\n\r\d]{0,80}${kw}`, 'i'),
-  ];
-  for (const r of looseBodyOrdereds) {
-    const m = sources.body.match(r);
+  for (const r of patterns) {
+    const m = fullSubject.match(r) || fullBody.match(r);
     if (m && m[1]) {
       const n = normalizeDigits(m[1]);
-      if (n && !isLikelyNonVerificationCode(n, sources.body)) {
+      if (n && !isLikelyNonVerificationCode(n, fullBody)) {
         return n;
       }
     }
